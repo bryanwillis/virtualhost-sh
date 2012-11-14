@@ -1,126 +1,132 @@
 #!/bin/sh
 #============================================ virtualhost.sh ============================================#
-# virtualhost.sh
-#
-# A fancy little script to setup a new Apache virtualhost in Ubuntu.
-# Based upon the excellent virtualhost (V1.29) script by Patrick Gibson <patrick@patrickg.com> for OS X.
-#
-# This script has been tested on Ubuntu 12.04 (Precise Pangolin) with Apache2 and probably works on
-# Debian as well, but this has not been tested. If you use this script on other Linux distributions
-# and can confirm it to work I would like to hear from you.
-# Just send an email to Ivan Koptiev <ikoptev@gmail.com> with more info.
-#
-# USAGE:
-# 
-# CREATE A VIRTUAL HOST:
-# sudo ./virtualhost <name>
-# where <name> is the one-word name you'd like to use. (e.g. mysite)
-#   
-# Note that if "virtualhost.sh" is not in your PATH, you will have to write
-# out the full path to where you've placed: eg. /usr/bin/virtualhost.sh <name>
-# 
-# REMOVE A VIRTUAL HOST:
-# sudo ./virtualhost --delete <site>
-#
-# where <site> is the site name you used when you first created the host. 
-#
-#======================================== SCRIPT CONFIGURATION ========================================#
+#                                                                                                        #
+# A fancy little script to setup a new Apache virtualhost in Ubuntu.                                     #
+# Based upon the excellent virtualhost (V1.29) script by Patrick Gibson <patrick@patrickg.com> for OS X  #
+# and it's Ubuntu implementation by Bjorn Wijers <burobjorn@burobjorn.nl>                                #
+#                                                                                                        #
+# This script has been tested on Ubuntu 12.04 (Precise Pangolin) with Apache2 and probably works on      #
+# Debian as well, but this has not been tested. If you use this script on other Linux distributions      #
+# and can confirm it to work I would like to hear from you.                                              #
+# Just send an email to Ivan Koptiev <ikoptev@gmail.com> with more info.                                 #
+#                                                                                                        #
+#                                                                                                        #
+#============================================ USAGE EXAMPLES ============================================#
+#                                                                                                        #    
+# LIST EXISTING VIRTUAL HOSTS:                                                                           #
+# sudo ./virtualhost --list                                                                              #
+#                                                                                                        #
+# CREATE A VIRTUAL HOST:                                                                                 #
+# sudo ./virtualhost <name>                                                                              #
+# where <name> is the one-word name you'd like to use. (e.g. mysite)                                     #
+#                                                                                                        #
+# REMOVE A VIRTUAL HOST:                                                                                 #
+# sudo ./virtualhost --delete <site>                                                                     #
+# where <site> is the site name you used when you first created the host.                                #
+#                                                                                                        #
+# ENABLE A VIRTUAL HOST:                                                                                 #
+# sudo ./virtualhost --enable <site>                                                                     #
+# where <site> is the site name you used when you first created the host.                                #
+#                                                                                                        #
+# DISABLE A VIRTUAL HOST:                                                                                #
+# sudo ./virtualhost --disable <site>                                                                    #
+# where <site> is the site name you used when you first created the host.                                #
+#                                                                                                        #
+# Note that if "virtualhost.sh" is not in your PATH, you will have to write                              #
+# out the full path to where you've placed: eg. /usr/bin/virtualhost.sh <name>                           #
+#                                                                                                        #
+#                                                                                                        #
+#========================================= SCRIPT CONFIGURATION =========================================#
+#                                                                                                        #
+# If you are using this script on a production machine with a static IP address, and you wish to setup   #
+# a "live" virtualhost, you can change the following IP address to the IP address of your machine.       #
+  IP_ADDRESS="127.0.0.1"                                                                                 #
+                                                                                                         #
+# By default, this script places files in /home/[you]/Sites. If you would like to change this,           #
+# like to how Apache on Ubuntu does things by default, uncomment the following line:                     #
+# DOC_ROOT_PREFIX="/var/www"                                                                             #
+                                                                                                         #
+# Configure the apache-related paths                                                                     #
+  APACHE_CONFIG="/etc/apache2"                                                                           #
+  APACHECTL="/usr/sbin/apache2ctl"                                                                       #
+                                                                                                         #
+# If you wish to change the default application that gets launched after the virtual host is created,    #
+# define it here:                                                                                        #
+  OPEN_COMMAND="/usr/bin/xdg-open"                                                                       #
+                                                                                                         #
+# If defined, a ServerAlias os $1.$WILDCARD_ZONE will be added to the virtual host file. This is useful  #
+# if you, for example, have setup a wildcard domain either on your own DNS server or using a server      #
+# like dyndns.org. For example, if my local IP of 10.0.42.42 is static (which can still be achieved      #
+# using a well-configured DHCP server or an Apple Airport Extreme 802.11n base station) and I create a   #
+# host on dyndns.org of patrickdev.dyndns.org with wildcard hostnames turned on, then defining my        #
+# WILDCARD_ZONE to "patrickdev.dyndns.org" will enable access to my virtual host from any machine on     #
+# the network. Note that this would also work with a public IP too, and the virtual hosts on your        #
+# machine would be accessible to anyone on the internets.                                                #
+# WILDCARD_ZONE="my.wildcard.host.address"                                                               #
+                                                                                                         #
+# A feature to specify a custom log location within your site's document root was requested, and so you  #
+# will be prompted about this when you create a new virtual host. If you do not want to be prompted,     #
+# set the following to "no":                                                                             #
+  PROMPT_FOR_LOGS="no"                                                                                   #
+                                                                                                         #
+# If you do not want to be prompted, but you do always want to have the site-specific logs folder, set   #
+# PROMPT_FOR_LOGS="no" and enable this:                                                                  #
+  ALWAYS_CREATE_LOGS="yes"                                                                               #
+                                                                                                         #
+# By default, log files will be created in DOCUMENT_ROOT/logs. If you wish to override this to a static  #
+# location, you can do so here.                                                                          #
+# LOG_FOLDER="/var/log/httpd"                                                                            #
+                                                                                                         #
+# If you have an atypical setup, and you don't need or want entries in your /etc/hosts file, you can     #
+# set the following option to "yes".                                                                     #
+  SKIP_ETC_HOSTS="no"                                                                                    #
+                                                                                                         #
+# If you are running this script on a platform other than Ubuntu, your home maybe be different.          #
+# If so, change it here.                                                                                 #
+  HOME_PARTITION="/home"                                                                                 #
+                                                                                                         #
+# If your environment has a different default DocumentRoot, and you don't want to be nagged about        #
+# "fixing" your DocumentRoot, set this to "yes".                                                         #
+  SKIP_DOCUMENT_ROOT_CHECK="no"                                                                          #
+                                                                                                         #
+# If Apache works on a different port than the default 80, set it here                                   #
+  APACHE_PORT="80"                                                                                       #
+                                                                                                         #
+# Batch mode (all prompting will assume Yes). Any value will activate this. Can be set here,             #
+# in ~/.virtualhost.sh.conf, or on the command line, like: BATCH_MODE=yes virtualhost.sh mysite          #
+# BATCH_MODE="yes"                                                                                       #
+                                                                                                         #
+# If you're satisfied with the version you have and do not wish to be reminded of a new version,         #
+# add the following line to your ~/.virtualhost.sh.conf file.                                            #
+# SKIP_VERSION_CHECK="yes"                                                                               #
+                                                                                                         #
+# We now will search your $DOC_ROOT_PREFIX for a matching subfolder using find. By default, we will      #
+# go two levels deep so that it doesn't take too long. If you have a really complex structure,           #
+# you may need to increase this.                                                                         #
+  MAX_SEARCH_DEPTH=2                                                                                     #
+                                                                                                         #
+# Set to "yes" if you don't have a browser (headless) or don't want the site to be launched in your      #
+# browser after the virtualhost is setup.                                                                #
+# SKIP_BROWSER="yes"                                                                                     #
+                                                                                                         #
+# You can now store your configuration directions in a ~/.config/virtualhost.sh.conf file so that you    #
+# can download new versions of the script without having to redo your own settings.                      #
+  if [ -e ~/.config/virtualhost.sh.conf ]; then                                                          #
+    . ~/.config/virtualhost.sh.conf                                                                      #
+  fi                                                                                                     #
+                                                                                                        #
+#========================================================================================================#
 
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# If you are using this script on a production machine with a static IP address,
-# and you wish to setup a "live" virtualhost, you can change the following IP
-# address to the IP address of your machine.
-#
-IP_ADDRESS="127.0.0.1"
 
-# By default, this script places files in /Users/[you]/Sites. If you would like
-# to change this, like to how Apple does things by default, uncomment the
-# following line:
-#
-#DOC_ROOT_PREFIX="/Library/WebServer/Documents"
 
-# Configure the apache-related paths
-#
-APACHE_CONFIG="/private/etc/apache2"
-APACHECTL="/usr/sbin/apachectl"
+#========================================================================================================#
+#                                            CODE STARTS HERE                                            #
+#--------------------------------------------------------------------------------------------------------#
+#                     do not edit below this line unless you know what you are doing                     #
+#========================================================================================================#
 
-# If you wish to change the default application that gets launched after the
-# virtual host is created, define it here:
-OPEN_COMMAND="/usr/bin/open"
-
-# If you want to use a different browser than Safari, define it here:
-#BROWSER="Firefox"
-#BROWSER="WebKit"
-#BROWSER="Google Chrome"
-
-# If defined, a ServerAlias os $1.$WILDCARD_ZONE will be added to the virtual
-# host file. This is useful if you, for example, have setup a wildcard domain
-# either on your own DNS server or using a server like dyndns.org. For example,
-# if my local IP of 10.0.42.42 is static (which can still be achieved using a
-# well-configured DHCP server or an Apple Airport Extreme 802.11n base station)
-# and I create a host on dyndns.org of patrickdev.dyndns.org with wildcard
-# hostnames turned on, then defining my WILDCARD_ZONE to "patrickdev.dyndns.org"
-# will enable access to my virtual host from any machine on the network. Note
-# that this would also work with a public IP too, and the virtual hosts on your
-# machine would be accessible to anyone on the internets.
-#WILDCARD_ZONE="my.wildcard.host.address"
-
-# A feature to specify a custom log location within your site's document root
-# was requested, and so you will be prompted about this when you create a new
-# virtual host. If you do not want to be prompted, set the following to "no":
-PROMPT_FOR_LOGS="no"
-
-# If you do not want to be prompted, but you do always want to have the site-
-# specific logs folder, set PROMPT_FOR_LOGS="no" and enable this:
-ALWAYS_CREATE_LOGS="yes"
-
-# By default, log files will be created in DOCUMENT_ROOT/logs. If you wish to
-# override this to a static location, you can do so here.
-#LOG_FOLDER="/var/log/httpd"
-
-# If you have an atypical setup, and you don't need or want entries in your
-# /etc/hosts file, you can set the following option to "yes".
-SKIP_ETC_HOSTS="no"
-
-# If you are running this script on a platform other than Mac OS X, your home
-# partition is going to be different. If so, change it here.
-HOME_PARTITION="/Users"
-
-# If your environment has a different default DocumentRoot, and you don't want
-# to be nagged about "fixing" your DocumentRoot, set this to "yes".
-SKIP_DOCUMENT_ROOT_CHECK="no"
-
-# If Apache works on a different port than the default 80, set it here
-APACHE_PORT="80"
-
-# Batch mode (all prompting will assume Yes). Any value will activate this. Can
-# be set here, in ~/.virtualhost.sh.conf, or on the command line, like:
-# BATCH_MODE=yes virtualhost.sh mysite
-#BATCH_MODE="yes"
-
-# If you're satisfied with the version you have and do not wish to be reminded
-# of a new version, add the following line to your ~/.virtualhost.sh.conf file.
-#SKIP_VERSION_CHECK="yes"
-
-# We now will search your $DOC_ROOT_PREFIX for a matching subfolder using find.
-# By default, we will go two levels deep so that it doesn't take too long. If
-# you have a really complex structure, you may need to increase this.
-MAX_SEARCH_DEPTH=2
-
-# Set to "yes" if you don't have a browser (headless) or don't want the site
-# to be launched in your browser after the virtualhost is setup.
-#SKIP_BROWSER="yes"
-
-# You can now store your configuration directions in a ~/.virtualhost.sh.conf
-# file so that you can download new versions of the script without having to
-# redo your own settings.
-if [ -e ~/.virtualhost.sh.conf ]; then
-  . ~/.virtualhost.sh.conf
-fi
-
-# Don't change this!
+# Script version
 version="1.29"
-#
 
 # No point going any farther if we're not running correctly...
 if [ `whoami` != 'root' ]; then
@@ -136,8 +142,28 @@ if [ "$SUDO_USER" = "root" ]; then
   exit 1
 fi
 
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+#========================================================================================================#
+# Declare some custom functions                                                                          #
+#========================================================================================================#
+
+# Print help page and usage examples TODO -> Update help text
+usage()
+{
+  cat << __EOT
+Usage: sudo virtualhost.sh <name>
+       sudo virtualhost.sh --list
+       sudo virtualhost.sh --delete <name>
+   where <name> is the one-word name you'd like to use. (e.g. mysite)
+
+   Note that if "virtualhost.sh" is not in your PATH, you will have to write
+   out the full path to it: eg. /home/$USER/Desktop/virtualhost.sh <name>
+
+__EOT
+  exit 1
+}
+
+# Check whether host exists in the /etc/hosts
 host_exists()
 {
   if grep -q -e "^$IP_ADDRESS  $1$" /etc/hosts ; then
@@ -147,15 +173,7 @@ host_exists()
   fi
 }
 
-open_command()
-{
-  if [ ! -z "$BROWSER" ]; then
-    $OPEN_COMMAND -a "$BROWSER" "$@"
-  else
-    $OPEN_COMMAND "$@"
-  fi
-}
-
+# Create new virtual host
 create_virtualhost()
 {
   if [ ! -z $WILDCARD_ZONE ]; then
@@ -189,6 +207,7 @@ create_virtualhost()
 <VirtualHost *:$APACHE_PORT>
   DocumentRoot "$2"
   ServerName $1
+  ServerAlias www.$1
   $SERVER_ALIAS
 
   ScriptAlias /cgi-bin "$2/cgi-bin"
@@ -205,6 +224,12 @@ create_virtualhost()
 
 </VirtualHost>
 __EOF
+}
+
+# Launch external command with host URL as a param
+open_command()
+{
+  $OPEN_COMMAND "$@"
 }
 
 cleanup()
@@ -236,6 +261,7 @@ checkyesno()
 
 version_check()
 {
+<<COMMENT1
   /bin/echo -n "Checking for updates... "
   current_version=`dig +tries=1 +time=1 +retry=0 txt virtualhost.patrickgibson.com | grep -e '^virtualhost' | awk '{print $5}' | sed -e 's/"//g'`
 
@@ -272,21 +298,20 @@ version_check()
   else
     /bin/echo "failed. Are you online?"
   fi
+COMMENT1
 }
 
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
 
-# Make sure this is an Apache 2.x / Leopard machine
+# Make sure that Apache is installed
 if [ ! -d $APACHE_CONFIG ]; then
   /bin/echo "Could not find ${APACHE_CONFIG}"
-  /bin/echo "Sorry, this version of virtualhost.sh only works with Leopard. You can download an older version which works with previous versions of Mac OS X here:"
-  /bin/echo
-  /bin/echo "http://patrickgibson.com/news/andsuch/virtualhost.tgz"
-  /bin/echo
+  /bin/echo "Please, recheck your virtualhost.sh settings and try again."
 
   exit 1
 fi
 
+############################################ INVENT SOMETHING
 if [ -z $SKIP_VERSION_CHECK ]; then
   version_check
 fi
@@ -297,6 +322,7 @@ fi
 # restore it
 #trap '' 2
 
+# Resolve current user name
 if [ -z $USER -o $USER = "root" ]; then
   if [ ! -z $SUDO_USER ]; then
     USER=$SUDO_USER
@@ -323,40 +349,20 @@ if [ -z $USER -o $USER = "root" ]; then
   fi
 fi
 
+# Resolve document root
 if [ -z $DOC_ROOT_PREFIX ]; then
   DOC_ROOT_PREFIX="${HOME_PARTITION}/$USER/Sites"
 fi
 
-usage()
-{
-  cat << __EOT
-Usage: sudo virtualhost.sh <name>
-       sudo virtualhost.sh --list
-       sudo virtualhost.sh --delete <name>
-   where <name> is the one-word name you'd like to use. (e.g. mysite)
-
-   Note that if "virtualhost.sh" is not in your PATH, you will have to write
-   out the full path to it: eg. /Users/$USER/Desktop/virtualhost.sh <name>
-
-__EOT
-  exit 1
-}
-
+# Parse given options
 if [ -z $1 ]; then
   usage
 else
-  if [ "$1" = "--delete" ]; then
-    if [ -z $2 ]; then
-      usage
-    else
-      VIRTUALHOST=$2
-      DELETE=0
-    fi
-  elif [ "$1" = "--list" ]; then
-    if [ -d $APACHE_CONFIG/virtualhosts ]; then
-      echo "Listing virtualhosts found in $APACHE_CONFIG/virtualhosts"
+  if [ "$1" = "--list" ] || [ "$1" = "-l" ]; then
+    if [ -d $APACHE_CONFIG/sites-available ]; then
+      echo "Listing virtualhosts found in $APACHE_CONFIG/sites-available"
       echo
-      for i in $APACHE_CONFIG/virtualhosts/*; do
+      for i in $APACHE_CONFIG/sites-available/*; do
         server_name=`grep ServerName $i | awk '{print $2}'`
         doc_root=`grep DocumentRoot $i | awk '{print $2}' | sed -e 's/"//g'`
         echo "http://${server_name}/ -> ${doc_root}"
@@ -366,6 +372,27 @@ else
     fi
 
     exit
+  elif [ "$1" = "--delete" ] || [ "$1" = "-d" ]; then
+    if [ -z $2 ]; then
+      usage
+    else
+      VIRTUALHOST=$2
+      DELETE=0
+    fi
+  elif [ "$1" = "--enable" ]; then
+    if [ -z $2 ]; then
+      usage
+    else
+      VIRTUALHOST=$2
+      ENABLE=0
+    fi
+  elif [ "$1" = "--disable" ]; then
+    if [ -z $2 ]; then
+      usage
+    else
+      VIRTUALHOST=$2
+      DISABLE=0
+    fi
   else
     VIRTUALHOST=$1
   fi
@@ -783,26 +810,28 @@ __EOF
 fi
 
 
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# Create a default virtualhost file
-#
+#========================================================================================================#
+# Create a default virtualhost file                                                                      #
+#========================================================================================================#
 /bin/echo -n "+ Creating virtualhost file... "
 create_virtualhost $VIRTUALHOST "${FOLDER}" $log
 /bin/echo "done"
 
 
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# Restart apache for the changes to take effect
+#========================================================================================================#
+# Restart Apache for the changes to take effect                                                          #
+#========================================================================================================#
+
+# TODO -> Add nscd support
+#if [ -x /usr/bin/dscacheutil ]; then
+#  /bin/echo -n "+ Flushing cache... "
+#  dscacheutil -flushcache
+#  /bin/echo "done"
 #
-if [ -x /usr/bin/dscacheutil ]; then
-  /bin/echo -n "+ Flushing cache... "
-  dscacheutil -flushcache
-  /bin/echo "done"
-
-  dscacheutil -q host | grep -q $VIRTUALHOST
-
-  sleep 1
-fi
+#  dscacheutil -q host | grep -q $VIRTUALHOST
+#
+#  sleep 1
+#fi
 
 /bin/echo -n "+ Restarting Apache... "
 $APACHECTL graceful 1>/dev/null 2>/dev/null
@@ -815,9 +844,9 @@ http://$VIRTUALHOST:$APACHE_PORT/ is setup and ready for use.
 __EOF
 
 
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# Launch the new URL in the browser
-#
+#========================================================================================================#
+# Launch the new URL in the browser                                                                      #
+#========================================================================================================#
 if [ -z $SKIP_BROWSER ]; then
   /bin/echo -n "Launching virtualhost... "
   sleep 1
